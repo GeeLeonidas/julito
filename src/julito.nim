@@ -9,8 +9,6 @@ assert os.existsEnv("JULITO_TOKEN"), "Env variable `JULITO_TOKEN` is missing!"
 let discord = newDiscordClient(os.getEnv("JULITO_TOKEN"))
 var cmd = discord.newHandler()
 
-var voiceSessions: Table[string, tuple[chanID: string, ready: bool]]
-
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
   await cmd.registerCommands()
   echo r.user, " is ready!"
@@ -23,16 +21,11 @@ proc voiceServerUpdate(s: Shard, g: Guild, token: string;
   let vc = s.voiceConnections[g.id]
 
   vc.voiceEvents.onReady = proc (v: VoiceClient) {.async.} =
-    voiceSessions[g.id].ready = true
+    readyVoiceSession(g.id)
 
   vc.voiceEvents.onSpeaking = proc (v: VoiceClient, s: bool) {.async.} =
-    if not s and v.sent == 0 and voiceSessions[g.id].chanID != "":
-      try:
-        discard await discord.api.sendMessage(
-          voiceSessions[g.id].chanId, "Playback ended."
-        )
-      except:
-        echo "Permission error"
+    if not s and v.sent == 0:
+      echo "Playback ended"
   echo "Starting session"
   await vc.startSession()
 
@@ -52,19 +45,16 @@ cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
       )
     )
     return
-  if i.guildId.get notin s.voiceConnections:
-    await s.voiceStateUpdate(
-      guildId = i.guildId.get,
-      channelId = g.voiceStates[i.member.get.user.id].channelId,
-      selfDeaf = true
+  if i.guildId.get in currentPlaybackUrl and currentPlaybackUrl[i.guildId.get] != "":
+    await discord.api.interactionResponseMessage(i.id, i.token,
+      kind = irtChannelMessageWithSource,
+      response = InteractionCallbackDataMessage(
+        content: "This bot currently doesn't support queues.",
+        flags: { mfEphemeral }
+      )
     )
-    voiceSessions[g.id] = (chanId: i.channelId.get, ready: false)
-
-  while not voiceSessions[g.id].ready:
-    await sleepAsync 10
-
+    return
   let
-    vc = s.voiceConnections[i.guildId.get]
     playbackUrl =
       if url.match(re"https:\/\/(?:www\.|)youtu\.be\/([^\?\/]+)") or
          url.match(re"https:\/\/(?:www\.|)youtube\.com\/watch\?v=([^\?\/]+)") or
@@ -72,24 +62,23 @@ cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
         url
       else:
         fmt"https://youtu.be/{pickPetitVideoCode()}"
-  let playing = fmt"Playing {playbackUrl}"
+    playing = fmt"Playing {playbackUrl}"
   await discord.api.interactionResponseMessage(i.id, i.token,
     kind = irtChannelMessageWithSource,
     response = InteractionCallbackDataMessage(
       content: playing
     )
   )
+  await s.connectToVoiceChannel(g.voiceStates[i.member.get.user.id].channelId, i.guildId.get)
+
+  let vc = s.voiceConnections[i.guildId.get]
   echo playing
   try:
+    currentPlaybackUrl[i.guildId.get] = playbackUrl
     await vc.playYTDL(playbackUrl, "yt-dlp")
   except:
-    await discord.api.interactionResponseMessage(i.id, i.token,
-      kind = irtChannelMessageWithSource,
-      response = InteractionCallbackDataMessage(
-        content: fmt"Given `{url}` is not a valid URL.",
-        flags: { mfEphemeral }
-      )
-    )
+    currentPlaybackUrl[i.guildId.get] = ""
+    echo fmt"Invalid URL {playbackUrl}"
 
 cmd.addSlash("stop", guildId = DefaultGuildId) do ():
   ## Stops current playback and disconnects from voice
@@ -123,7 +112,7 @@ cmd.addSlash("stop", guildId = DefaultGuildId) do ():
   echo stopping
 
   vc.stopped = true
-  voicesessions[i.guildId.get].ready = false
+  unreadyVoiceSession(i.guildId.get)
   await s.voiceStateUpdate( # if channelID is none then we would disconnect
       guildID = i.guildId.get,
       channelId = none string
