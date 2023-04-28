@@ -8,12 +8,15 @@ var
 
 proc pickPetitVideoCode*(): string =
   result = "wDgQdr8ZkTw"
-  let
-    pattern = re"https:\/\/(?:www\.|)youtube\.com\/(?:[a-z]+)\/([^\?\/]+)"
-    petit = fetch("https://petittube.com/")
-  var youtubeMatches: array[8, string]
-  if petit.find(pattern, youtubeMatches) >= 0:
-    return youtubeMatches[0]
+  try:
+    let
+      pattern = re"https:\/\/(?:www\.|)youtube\.com\/(?:[a-z]+)\/([^\?\/]+)"
+      petit = fetch("https://petittube.com/")
+    var youtubeMatches: array[8, string]
+    if petit.find(pattern, youtubeMatches) >= 0:
+      return youtubeMatches[0]
+  except PuppyError:
+    echo "Error fetching Petit Tube"
 
 proc connectToVoiceChannel*(s: Shard; voiceChannelId: Option[string]; guildId: string) {.async.} =
   if guildId notin s.voiceConnections:
