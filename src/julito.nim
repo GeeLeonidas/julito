@@ -32,6 +32,8 @@ proc voiceServerUpdate(s: Shard, g: Guild, token: string;
       echo "Playback ended"
       currentPlaybackUrl.del(g.id)
       vc.stopped = true
+      v.loops = 0
+      v.start = 0.0
       if playbackQueue.getOrDefault(g.id).len == 0:
         echo "Deleting queue..."
         playbackQueue.del(g.id)
