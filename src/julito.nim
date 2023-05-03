@@ -51,8 +51,27 @@ proc voiceServerUpdate(s: Shard, g: Guild, token: string;
 cmd.addSlash("connect", guildId = DefaultGuildId) do ():
   ## Enters the voice channel you're connected to without adding to queue
   let g = s.cache.guilds[i.guildId.get]
-  await s.connectToVoiceChannel(g.voiceStates[i.member.get.user.id].channelId, i.guildId.get)
-
+  echo "In the command `connect`"
+  if i.member.get.user.id notin g.voiceStates:
+    await discord.api.interactionResponseMessage(i.id, i.token,
+      kind = irtChannelMessageWithSource,
+      response = InteractionCallbackDataMessage(
+        content: "You're not connected to a voice channel.",
+        flags: { mfEphemeral }
+      )
+    )
+    return
+  let
+    voiceChannelId = g.voiceStates[i.member.get.user.id].channelId
+    connecting = fmt"Connecting to <#{voiceChannelId.get}>..."
+  await discord.api.interactionResponseMessage(i.id, i.token,
+    kind = irtChannelMessageWithSource,
+    response = InteractionCallbackDataMessage(
+      content: ""
+    )
+  )
+  await s.connectToVoiceChannel(voiceChannelId, i.guildId.get)
+  
 cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
   ## Plays given youtube content at the voice channel you're connected to
   let g = s.cache.guilds[i.guildId.get]
@@ -74,7 +93,7 @@ cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
         url
       else:
         fmt"https://youtu.be/{pickPetitVideoCode()}"
-    voiceChannel = g.voiceStates[i.member.get.user.id].channelId
+    voiceChannelId = g.voiceStates[i.member.get.user.id].channelId
   if i.guildId.get in currentPlaybackUrl and currentPlaybackUrl[i.guildId.get] != "":
     if not playbackQueue.hasKey(i.guildId.get):
       playbackQueue[i.guildId.get] = @[]
@@ -89,9 +108,9 @@ cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
       )
     )
     echo queueing
-    await s.connectToVoiceChannel(voiceChannel, i.guildId.get)
+    await s.connectToVoiceChannel(voiceChannelId, i.guildId.get)
     return
-  let playing = fmt"Playing {playbackUrl} at <#{voiceChannel.get}>!"
+  let playing = fmt"Playing {playbackUrl} at <#{voiceChannelId.get}>!"
   await discord.api.interactionResponseMessage(i.id, i.token,
     kind = irtChannelMessageWithSource,
     response = InteractionCallbackDataMessage(
