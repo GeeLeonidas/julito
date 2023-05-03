@@ -48,6 +48,34 @@ proc voiceServerUpdate(s: Shard, g: Guild, token: string;
   await vc.startSession()
 
 
+cmd.addSlash("skip", guildId = DefaultGuildId) do ():
+  ## Skips current playback to next content in queue
+  echo "In the command `skip`"
+  if currentPlaybackUrl[i.guildId.get] == "":
+    await discord.api.interactionResponseMessage(i.id, i.token,
+      kind = irtChannelMessageWithSource,
+      response = InteractionCallbackDataMessage(
+        content: "There's no content to skip.",
+        flags: { mfEphemeral }
+      )
+    )
+    return
+  let playbackCount = playbackQueue.getOrDefault(i.guildId.get).len
+  if i.guildId.get in s.voiceConnections:
+    s.voiceConnections[i.guildId.get].stopped = true
+  let skipping =
+    if playbackCount == 0:
+      "Skipped to end of queue."
+    else:
+      "Skipped to next content."
+  echo skipping
+  await discord.api.interactionResponseMessage(i.id, i.token,
+    kind = irtChannelMessageWithSource,
+    response = InteractionCallbackDataMessage(
+      content: skipping
+    )
+  )
+
 cmd.addSlash("connect", guildId = DefaultGuildId) do ():
   ## Enters the voice channel you're connected to without adding to queue
   let g = s.cache.guilds[i.guildId.get]
@@ -67,9 +95,10 @@ cmd.addSlash("connect", guildId = DefaultGuildId) do ():
   await discord.api.interactionResponseMessage(i.id, i.token,
     kind = irtChannelMessageWithSource,
     response = InteractionCallbackDataMessage(
-      content: ""
+      content: connecting
     )
   )
+  echo connecting
   await s.connectToVoiceChannel(voiceChannelId, i.guildId.get)
   
 cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
