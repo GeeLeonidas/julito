@@ -3,6 +3,10 @@ import std/[asyncdispatch, options, strutils, strformat, tables, os, re]
 import dimscord, dimscmd
 import dotenv
 
+const
+  isDebugBuild = not (defined(release) or defined(danger))
+  DefaultGuildId = when isDebugBuild: "1067590610816602172" else: ""
+
 if os.fileExists(".env"):
   dotenv.load()
 assert os.existsEnv("JULITO_TOKEN"), "Env variable `JULITO_TOKEN` is missing!"
@@ -31,8 +35,6 @@ proc voiceServerUpdate(s: Shard, g: Guild, token: string;
   echo "Starting session"
   await vc.startSession()
 
-
-const DefaultGuildId = when defined(debug): "1067590610816602172" else: ""
 
 cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
   ## Plays given youtube content at the voice channel you're connected to
