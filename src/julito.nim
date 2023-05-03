@@ -26,6 +26,8 @@ proc voiceServerUpdate(s: Shard, g: Guild, token: string;
   vc.voiceEvents.onSpeaking = proc (v: VoiceClient, s: bool) {.async.} =
     if not s and v.sent == 0:
       echo "Playback ended"
+      currentPlaybackUrl.del(g.id)
+
   echo "Starting session"
   await vc.startSession()
 
