@@ -51,7 +51,7 @@ proc voiceServerUpdate(s: Shard, g: Guild, token: string;
 cmd.addSlash("skip", guildId = DefaultGuildId) do ():
   ## Skips current playback to next content in queue
   echo "In the command `skip`"
-  if currentPlaybackUrl[i.guildId.get] == "":
+  if currentPlaybackUrl.getOrDefault(i.guildId.get) == "":
     await discord.api.interactionResponseMessage(i.id, i.token,
       kind = irtChannelMessageWithSource,
       response = InteractionCallbackDataMessage(
