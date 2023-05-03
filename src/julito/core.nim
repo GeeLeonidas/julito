@@ -28,8 +28,15 @@ proc connectToVoiceChannel*(s: Shard; voiceChannelId: Option[string]; guildId: s
     )
     voiceSessionReady[guildId] = false
 
-  while not voiceSessionReady[guildId]:
-    await sleepAsync 10
+  const
+    TimeoutMs = 5000
+    StepMs = 10
+  var elapsedMs = 0
+  while elapsedMs < TimeoutMs and not voiceSessionReady[guildId]:
+    await sleepAsync StepMs
+    elapsedMs += StepMs
+  if elapsedMs >= TimeoutMs:
+    raise newException(ResourceExhaustedError, "Timeout for voice connection reached")
 
 proc tryToPlay*(vc: VoiceClient; guildId, playbackUrl: string) {.async.} =
   try:

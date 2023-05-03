@@ -99,7 +99,11 @@ cmd.addSlash("connect", guildId = DefaultGuildId) do ():
     )
   )
   echo connecting
-  await s.connectToVoiceChannel(voiceChannelId, i.guildId.get)
+  try:
+    await s.connectToVoiceChannel(voiceChannelId, i.guildId.get)
+  except ResourceExhaustedError:
+    echo "Timeout reached"
+    return
   
 cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
   ## Plays given youtube content at the voice channel you're connected to
@@ -137,7 +141,10 @@ cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
       )
     )
     echo queueing
-    await s.connectToVoiceChannel(voiceChannelId, i.guildId.get)
+    try:
+      await s.connectToVoiceChannel(voiceChannelId, i.guildId.get)
+    except ResourceExhaustedError:
+      echo "Timeout reached"
     return
   let playing = fmt"Playing {playbackUrl} at <#{voiceChannelId.get}>!"
   await discord.api.interactionResponseMessage(i.id, i.token,
@@ -146,7 +153,11 @@ cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
       content: playing
     )
   )
-  await s.connectToVoiceChannel(g.voiceStates[i.member.get.user.id].channelId, i.guildId.get)
+  try:
+    await s.connectToVoiceChannel(voiceChannelId, i.guildId.get)
+  except ResourceExhaustedError:
+    echo "Timeout reached"
+    return
 
   let vc = s.voiceConnections[i.guildId.get]
   echo playing
