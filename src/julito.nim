@@ -31,10 +31,25 @@ proc voiceServerUpdate(s: Shard, g: Guild, token: string;
     if not s and v.sent == 0:
       echo "Playback ended"
       currentPlaybackUrl.del(g.id)
-
+      vc.stopped = true
+      if playbackQueue.getOrDefault(g.id).len == 0:
+        echo "Deleting queue..."
+        playbackQueue.del(g.id)
+      else:
+        echo "Playing next video in queue..."
+        while currentPlaybackUrl.getOrDefault(g.id) == "" and playbackQueue.getOrDefault(g.id).len > 0:
+          let playbackUrl = playbackQueue[g.id][0]
+          playbackQueue[g.id].delete(0)
+          echo fmt"Trying to play {playbackUrl}"
+          await vc.tryToPlay(g.id, playbackUrl)
   echo "Starting session"
   await vc.startSession()
 
+
+cmd.addSlash("connect", guildId = DefaultGuildId) do ():
+  ## Enters the voice channel you're connected to without adding to queue
+  let g = s.cache.guilds[i.guildId.get]
+  await s.connectToVoiceChannel(g.voiceStates[i.member.get.user.id].channelId, i.guildId.get)
 
 cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
   ## Plays given youtube content at the voice channel you're connected to
@@ -49,15 +64,6 @@ cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
       )
     )
     return
-  if i.guildId.get in currentPlaybackUrl and currentPlaybackUrl[i.guildId.get] != "":
-    await discord.api.interactionResponseMessage(i.id, i.token,
-      kind = irtChannelMessageWithSource,
-      response = InteractionCallbackDataMessage(
-        content: "This bot currently doesn't support queues.",
-        flags: { mfEphemeral }
-      )
-    )
-    return
   let
     playbackUrl =
       if url.match(re"https:\/\/(?:www\.|)youtu\.be\/([^\?\/]+)") or
@@ -66,7 +72,24 @@ cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
         url
       else:
         fmt"https://youtu.be/{pickPetitVideoCode()}"
-    playing = fmt"Playing {playbackUrl}"
+    voiceChannel = g.voiceStates[i.member.get.user.id].channelId
+  if i.guildId.get in currentPlaybackUrl and currentPlaybackUrl[i.guildId.get] != "":
+    if not playbackQueue.hasKey(i.guildId.get):
+      playbackQueue[i.guildId.get] = @[]
+    let
+      queuePos = playbackQueue[i.guildId.get].len + 2
+      queueing = fmt"{playbackUrl} was added to queue! (Position: {queuePos})"
+    playbackQueue[i.guildId.get].add(playbackUrl)
+    await discord.api.interactionResponseMessage(i.id, i.token,
+      kind = irtChannelMessageWithSource,
+      response = InteractionCallbackDataMessage(
+        content: queueing
+      )
+    )
+    echo queueing
+    await s.connectToVoiceChannel(voiceChannel, i.guildId.get)
+    return
+  let playing = fmt"Playing {playbackUrl} at <#{voiceChannel.get}>!"
   await discord.api.interactionResponseMessage(i.id, i.token,
     kind = irtChannelMessageWithSource,
     response = InteractionCallbackDataMessage(

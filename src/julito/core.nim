@@ -1,10 +1,11 @@
-import std/[re, asyncdispatch, tables, options]
-import dimscord
+import std/[re, asyncdispatch, tables, options, strformat]
+import dimscord, dimscord/voice
 import puppy
 
 var
   voiceSessionReady: Table[string, bool]
   currentPlaybackUrl*: Table[string, string]
+  playbackQueue*: Table[string, seq[string]]
 
 proc pickPetitVideoCode*(): string =
   result = "wDgQdr8ZkTw"
@@ -29,6 +30,14 @@ proc connectToVoiceChannel*(s: Shard; voiceChannelId: Option[string]; guildId: s
 
   while not voiceSessionReady[guildId]:
     await sleepAsync 10
+
+proc tryToPlay*(vc: VoiceClient; guildId, playbackUrl: string) {.async.} =
+  try:
+    currentPlaybackUrl[guildId] = playbackUrl
+    await vc.playYTDL(playbackUrl, "yt-dlp")
+  except:
+    currentPlaybackUrl[guildId] = ""
+    echo fmt"Invalid URL {playbackUrl}"
   
 proc readyVoiceSession*(guildId: string) =
   voiceSessionReady[guildId] = true
