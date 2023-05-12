@@ -1,4 +1,4 @@
-import std/[re, asyncdispatch, tables, options, strformat]
+import std/[re, asyncdispatch, tables, options, strformat, strutils, os, osproc]
 import dimscord, dimscord/voice
 import puppy
 
@@ -38,11 +38,35 @@ proc connectToVoiceChannel*(s: Shard; voiceChannelId: Option[string]; guildId: s
   if elapsedMs >= TimeoutMs:
     raise newException(ResourceExhaustedError, "Timeout for voice connection reached")
 
+proc playYouTubeContent(vc: VoiceClient, playbackUrl: string) {.async.} =
+  const Command = "yt-dlp"
+  if findExe(Command) == "":
+    raise newException(OSError, fmt"Couldn't find `{Command}` in PATH (is it installed?)")
+
+  let 
+    output =
+      execProcess(
+        Command,
+        args = ["--get-url", playbackUrl],
+        options = {poUsePath,
+        poStdErrToStdOut}
+      )
+    first = output.split("\n")[0]
+    sec = output.split("\n")[1]
+  
+  if not first.startsWith("http") and not sec.startsWith("http"):
+      raise newException(ValueError, "Error occurred: " & output)
+
+  if not sec.startsWith("http"): 
+      await vc.playFFMPEG(first)
+  else:
+      await vc.playFFMPEG(sec)
+
 proc tryToPlay*(vc: VoiceClient; guildId, playbackUrl: string) {.async.} =
   try:
     currentPlaybackUrl[guildId] = playbackUrl
-    await vc.playYTDL(playbackUrl, "yt-dlp")
-  except:
+    await vc.playYouTubeContent(playbackUrl)
+  except ValueError, IOError:
     currentPlaybackUrl[guildId] = ""
     echo fmt"Invalid URL {playbackUrl}"
   

@@ -161,12 +161,7 @@ cmd.addSlash("play", guildId = DefaultGuildId) do (url: string):
 
   let vc = s.voiceConnections[i.guildId.get]
   echo playing
-  try:
-    currentPlaybackUrl[i.guildId.get] = playbackUrl
-    await vc.playYTDL(playbackUrl, "yt-dlp")
-  except:
-    currentPlaybackUrl[i.guildId.get] = ""
-    echo fmt"Invalid URL {playbackUrl}"
+  await vc.tryToPlay(i.guildId.get, playbackUrl)
 
 cmd.addSlash("stop", guildId = DefaultGuildId) do ():
   ## Stops current playback and disconnects from voice
